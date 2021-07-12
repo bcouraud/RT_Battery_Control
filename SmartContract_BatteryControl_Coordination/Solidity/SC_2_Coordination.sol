@@ -4,9 +4,7 @@
 pragma solidity >=0.4.21 <0.7.0;
 
 contract BatteryCoordination {
-    // The Market place stores the count of all the buyers, sellers who sent bids
     uint8 private householdsCount;
-//    uint8 private sellerCount;
     uint private operationalDeposit; // an amount of money used to pay all operation fees
     uint private aggregatedSoC;
     uint private energycommitted;
@@ -24,19 +22,15 @@ contract BatteryCoordination {
     mapping (address => uint) private WeightImport;
     mapping (address => uint) private WeightExport;
     //If we use state machine to coordinate all steps
-    enum State { BID_DEPOSIT_OPEN, BID_DEPOSIT_OVER, AWAITING_DELIVERY, COMPLETE, FINISHED}
+    enum State { DEPOSIT_OPEN, DATA_COLLECTION, COORDINATION, COMPLETE, FINISHED}
     State public currState;
 
     // The market place is owned by the DSO Agent:
     address payable public AggregatorAgent;
     // We also need to add a time: Times are either absolute unix timestamps (seconds since 1970-01-01) or time periods in seconds.
-    uint public marketEndTime; // not used yet
+    uint public EndTime; // not used yet
 
-    // Log the event about a bid being made by an address (Agent) and its amount
-    event LogBidMade(address indexed accountAddress, uint price, uint quantity, uint Weight); // Notice that weights
-    // are uint for now, as fixed point are not yet fully implemented (=> the DSO will divide by 10)
-    
-       // We need  a boolean to state the stage of the market place (open or not for receiving new offers/bids) Set to true at the end, disallows any change. By default initialized to `false`.
+       // We need  a boolean to state the stage of the coordination phase (open or not for receiving new offers/bids) Set to true at the end, disallows any change. By default initialized to `false`.
     bool ended;
 
     //  We create a modifier that could be used later to restrict some functions to only the operator. not needed for simple use
@@ -75,9 +69,9 @@ contract BatteryCoordination {
          return 1;
     }   
 
-    ///  Creation of a bid from an agent return The type of the agent (1 or 0)
+    ///  Agents submit their information
     function submitHouseholdData(uint _soc, uint _energyexported, uint _agenttype) public payable  returns (uint) {
-         // if we use state machine, require(currState == State.BID_DEPOSIT_OPEN, "Cannot confirm Bid deposit");
+         // if we use state machine, require(currState == State.DATA_COLLECTION, "Cannot confirm data submission");
        if (_agenttype == 1) {
             householdsCount++;}
         else  {
@@ -88,16 +82,14 @@ contract BatteryCoordination {
         energyalreadyexported = energyalreadyexported - EnergyExported[msg.sender]+ _energyexported;
         SoC[msg.sender] = _soc;
         EnergyExported[msg.sender] = _energyexported;
-        if (_energyexported >= 10) {
+        if (_energyexported >= 100) {
             WeightExport[msg.sender] = _soc*1000/aggregatedSoC;}
         else  {
             WeightExport[msg.sender] = 0;
-        }       
+        }
         WeightImport[msg.sender] = 0;
         depositAmount[msg.sender] = msg.value;
-         // if (timesup ***** or agent count reached) currState = State.BID_DEPOSIT_OVER;
-
-         return WeightExport[msg.sender];
+        return WeightExport[msg.sender];
     }
 
 /*  function getbalance(address agentaddress) public view returns(uint) {
@@ -117,9 +109,6 @@ contract BatteryCoordination {
         return out;
     }*/
 
-// The operator or DSO wants to retrieve all the bids. However, mapping does not allow to do that. Hence, we can either store each bid/agent into an iterable mapping
-// as shown here https://medium.com/rayonprotocol/creating-a-smart-contract-having-iterable-mapping-9b117a461115 or also the github (https://github.com/ethereum/dapp-bin/blob/master/library/iterable_mapping.sol)
-// or the operator/DSO makes as many requests to this Smart Contract to retrieve all the bids from all the registered agents. And if an agent has not placed a bid, it returns 0
     function ExtractWeights(address agentaddress) public view returns(uint[2] memory) {  // we store the
     // return into memory, not storage, as we do not ned it outside of the function
         require(msg.sender == AggregatorAgent,"Only DSO/Operator can call this.");
@@ -128,41 +117,28 @@ contract BatteryCoordination {
 
             array = [WeightImport[agentaddress], WeightExport[agentaddress]];
             return array;
-         //currState = State.AWAITING_DELIVERY;
+         //currState = State.COORDINATION;
 
     }
-/*
-// After negotiations, the DSO/operator wants to activate payment between agents, while specifying the amount
-  function settlement(address buyeraddress, address payable selleraddress, uint pricetopay) external onlyOperator {
-        // if we use state machine, require(currState == State.AWAITING_DELIVERY, "Cannot confirm delivery");
-        if (depositAmount[buyeraddress]>pricetopay){
-            // selleraddress.transfer(pricetopay); // we transfer the money to the seller
-            depositAmount[selleraddress] = depositAmount[selleraddress]+pricetopay; // we update the amounts in this SC
-            depositAmount[buyeraddress] = depositAmount[buyeraddress] - pricetopay;// we update the amounts in this SC
-        }
-        //currState = State.COMPLETE;
-    }
-*/
+
 // Once everything is finished, the DSO/operator close the negotiation by redistributing the money that is in the accounts
   function close(address payable agentaddress) external payable onlyOperator {
         // if we use state machine, require(currState == State.COMPLETE, "Cannot confirm delivery");
             // selleraddress.transfer(depositAmount[selleraddress]); // we transfer the money to the seller
             if (agentaddress!=AggregatorAgent){
-            agentaddress.transfer(depositAmount[agentaddress]); // we transfer the money to the seller
+            agentaddress.transfer(depositAmount[agentaddress]); // we transfer the money to the agent
             }
             else
             {
                 AggregatorAgent.transfer(operationalDeposit);
             }
-        //currState = State.FINISHED;
+        //currState = State.COMPLETE;
     }
 
-    // Once everything is finished, the DSO/operator close the negotiation by redistributing the money that is in the accounts
+    // Once everything is finished, the aggregator closes the steps by redistributing the money to the accounts
   function closecontract() external payable onlyOperator {
-        // if we use state machine, require(currState == State.COMPLETE, "Cannot confirm delivery");
-            // selleraddress.transfer(depositAmount[selleraddress]); // we transfer the money to the seller
             uint fee;
-            fee = 1000000000000000000;  // we define is a fee of operational cost that should be removed...
+            fee = 0;  // we define is a fee of operational cost that should be removed. 0 for private blockchain.
                 msg.sender.transfer(operationalDeposit-fee);
         //currState = State.FINISHED;
     }
@@ -170,14 +146,3 @@ contract BatteryCoordination {
 
 }
 
-
-
-/*     // The following comment is a so-called natspec comment, recognizable by the three slashes. It will be shown when the user is asked to confirm a transaction.
-    /// Create a simple MarketPlace with `_marketEndTime` seconds bidding time 
-    constructor(
-        uint _marketEndTime,
-   //     address payable _beneficiary
-    ) public {
-     //   beneficiary = _beneficiary;
-        marketEndTime = now + _marketEndTime;
-    } */
