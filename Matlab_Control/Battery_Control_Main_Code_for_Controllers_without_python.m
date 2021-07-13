@@ -13,7 +13,7 @@ Safety_Coefficient = 1; %this represents the percentage of the big export that w
 Type_of_Selling_Price = 1;  %1 for Market Day-ahead price, 2 for no selling tariff
 Type_of_Buying_Price = 1; %1 for Agile tarif, 2 for ToU with 2 prices (Peak and low price), 3 for flat tariff
 
-Flat_Buying_Price = 17/100/1000; %17p£/kWh
+Flat_Buying_Price = 17/100/1000; %17pÂ£/kWh
 Peak_Buying_Price = 19/100/1000;
 Low_Buying_Price = 12/100/1000;
 
@@ -1441,8 +1441,8 @@ fprintf("S6:Max Revenues for VPP with assets in one place with battery with hous
 fprintf("S6:Households Bills: %0.1f \n", Bills_of_Houseolds);
 fprintf("S6: Market Revenues: %0.1f \n", VPP_Revenues);
 
-fprintf("S0: original Bill: %0.1f £\n", sum(DoriginMarketsize.*BP3));
-fprintf("S1: original Bill: %0.1f £\n", sum(DoriginMarketsize.*BP3));
+fprintf("S0: original Bill: %0.1f Â£\n", sum(DoriginMarketsize.*BP3));
+fprintf("S1: original Bill: %0.1f Â£\n", sum(DoriginMarketsize.*BP3));
 Error =zeros(size(t3));
 countE = 0;
 for k = 1:size(t3,1)
@@ -1854,7 +1854,7 @@ PAR_after(d) = max(Household_Power(:,d))/(Average_after(d)+0.000001)*60/1000;
 PAR_before(d) = max(Porigin(:,d)-Dorigin(:,d))*60/1000/Average_before(d);
     
 end
-PAR_after(6) = 0;
+
 AggregatedLoad_After = sum(Household_Power,2);
 Average_Aggregated_After = mean(AggregatedLoad_After)*60/1000
 Average_Aggregated_Before = mean(SumPorigin-SumDorigin)*60/1000
@@ -1996,7 +1996,7 @@ figure5 = figure('Name','Selling Price','Color',[1 1 1]);
 set(axes1,'ycolor','#000000');
  yticks([0.3 0.5 0.7])
 datetick('x','mmm dd','keeplimits','keepticks')
-        ylabel('€/MWh');
+        ylabel('Â€/MWh');
  
         box(axes1,'on');
         % Set the remaining axes properties
